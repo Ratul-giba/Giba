@@ -1,0 +1,199 @@
+giba/
+├── client/
+│   ├── package.json
+│   ├── public/
+│   │   └── index.html
+│   └── src/
+│       ├── index.js
+│       ├── App.js
+│       ├── App.css
+│       ├── components/
+│       │   ├── Header.js
+│       │   ├── ProductList.js
+│       │   └── Cart.js
+│       └── pages/
+│           ├── Home.js
+│           └── Checkout.js
+└── server/
+    ├── package.json
+    ├── server.js
+    ├── .env
+    ├── routes/
+    │   ├── products.js
+    │   └── orders.js
+    ├── controllers/
+    │   ├── productsController.js
+    │   └── ordersController.js
+    └── models/
+        ├── Product.js
+        └── Order.js
+{
+  "name": "giba-client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.0.0",
+    "axios": "^0.27.2"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GIBA Store</title>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import './App.css';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import Header from './components/Header';
+import Home from './pages/Home';
+import Checkout from './pages/Checkout';
+
+function App() {
+  return (
+    <div className="App">
+      <Header />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/checkout" element={<Checkout />} />
+      </Routes>
+    </div>
+  );
+}
+
+export default App;
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+.App {
+  text-align: center;
+}
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; padding: 8px 16px; }
+import React from 'react';
+import { Link } from 'react-router-dom';
+
+export default function Header() {
+  return (
+    <header style={{ padding: '10px', background: '#333', color: '#fff' }}>
+      <h1>GIBA Store</h1>
+      <nav>
+        <Link to="/" style={{ margin: '0 10px' }}>Home</Link>
+        <Link to="/checkout" style={{ margin: '0 10px' }}>Checkout</Link>
+      </nav>
+    </header>
+  );
+}
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+export default function ProductList({ onAdd }) {
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/products')
+      .then(res => setProducts(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+      {products.map(p => (
+        <div key={p._id} style={{ margin: 10, border: '1px solid #ccc', padding: 10 }}>
+          <h3>{p.name}</h3>
+          <p>₹{p.price}</p>
+          <button onClick={() => onAdd(p)}>Add to Cart</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+import React from 'react';
+import { Link } from 'react-router-dom';
+
+export default function Cart({ cartItems }) {
+  const total = cartItems.reduce((sum, item) => sum + item.price, 0);
+  return (
+    <div style={{ padding: '10px' }}>
+      <h2>Cart ({cartItems.length})</h2>
+      <ul>
+        {cartItems.map((c, i) => <li key={i}>{c.name} – ₹{c.price}</li>)}
+      </ul>
+      <h3>Total: ₹{total}</h3>
+      <Link to="/checkout"><button>Proceed to Checkout</button></Link>
+    </div>
+  );
+}
+import React, { useState } from 'react';
+import ProductList from '../components/ProductList';
+import Cart from '../components/Cart';
+
+export default function Home() {
+  const [cartItems, setCartItems] = useState([]);
+  const handleAdd = p => setCartItems([...cartItems, p]);
+
+  return (
+    <div>
+      <ProductList onAdd={handleAdd} />
+      <Cart cartItems={cartItems} />
+    </div>
+  );
+}
+import React, { useState } from 'react';
+import axios from 'axios';
+import { loadScript } from '@razorpay/checkout';
+
+export default function Checkout() {
+  const [amount, setAmount] = useState(0);
+
+  const handlePayment = async () => {
+    const { data } = await axios.post('http://localhost:5000/api/orders', { amount });
+    const options = {
+      key: process.env.REACT_APP_RAZORPAY_KEY,
+      amount: data.amount,
+      currency: "INR",
+      order_id: data.id,
+      handler: res => {
+        axios.post('http://localhost:5000/api/orders/verify', res)
+          .then(() => alert('Payment Successful'))
+          .catch(() => alert('Payment Verification Failed'));
+      }
+    };
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <h2>Checkout</h2>
+      <input
+        type="number" placeholder="Amount in INR"
+        value={amount} onChange={e => setAmount(e.target.value)}
+      />
+      <button onClick={handlePayment}>Pay with Razorpay</button>
+    </div>
+  );
+}
